@@ -2,6 +2,13 @@
 
 **Last Updated:** 2025-01-21
 
+## Current Environment
+
+- **Database:** PostgreSQL 17 (local via Homebrew)
+- **Database Name:** recnik
+- **Status:** Running with 10 sample words seeded
+- **Dev Server:** http://localhost:3000
+
 ## Overall Progress
 
 | Phase | Status | Progress |
