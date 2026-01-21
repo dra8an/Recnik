@@ -1,0 +1,172 @@
+// Serbian Dictionary (Recnik) Database Schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Main word entries (lemmas)
+model Word {
+  id            String    @id @default(cuid())
+  word          String    // Canonical form (Cyrillic preferred)
+  cyrillic      String    // Cyrillic spelling
+  latin         String    // Latin spelling
+  partOfSpeech  String    @map("part_of_speech") // imenica, glagol, pridev, etc.
+  gender        String?   // muški, ženski, srednji (for nouns)
+  aspect        String?   // svršeni, nesvršeni (for verbs)
+  frequencyRank Int?      @map("frequency_rank")
+  isCommon      Boolean   @default(false) @map("is_common")
+  source        String?   // Data source reference
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  definitions    Definition[]
+  inflections    Inflection[]
+  pronunciations Pronunciation[]
+  etymologies    Etymology[]
+  wordOfDay      WordOfDay[]
+
+  // Self-referential relations for synonyms/antonyms
+  relatedFrom    WordRelation[] @relation("RelatedFrom")
+  relatedTo      WordRelation[] @relation("RelatedTo")
+
+  @@unique([cyrillic, partOfSpeech])
+  @@index([word])
+  @@index([cyrillic])
+  @@index([latin])
+  @@index([frequencyRank])
+  @@map("words")
+}
+
+// Definitions for each word
+model Definition {
+  id               String   @id @default(cuid())
+  wordId           String   @map("word_id")
+  definitionText   String   @map("definition_text")
+  definitionNumber Int      @default(1) @map("definition_number")
+  register         String?  // formal, colloquial, archaic, etc.
+  domain           String?  // medicine, law, technology, etc.
+  source           String?  // Origin of definition (wiktionary, etc.)
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  // Relations
+  word     Word      @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  examples Example[]
+
+  @@index([wordId])
+  @@map("definitions")
+}
+
+// Usage examples
+model Example {
+  id           String   @id @default(cuid())
+  definitionId String   @map("definition_id")
+  exampleText  String   @map("example_text")
+  source       String?  // MaCoCu corpus, etc.
+  translation  String?  // English translation if available
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // Relations
+  definition Definition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+
+  @@index([definitionId])
+  @@map("examples")
+}
+
+// Inflected forms
+model Inflection {
+  id              String  @id @default(cuid())
+  wordId          String  @map("word_id")
+  form            String  // The inflected form
+  formCyrillic    String  @map("form_cyrillic")
+  formLatin       String  @map("form_latin")
+  grammaticalInfo String? @map("grammatical_info") // Full grammatical description
+
+  // Grammatical categories
+  case            String? // nominativ, genitiv, dativ, akuzativ, vokativ, instrumental, lokativ
+  number          String? // jednina, množina
+  gender          String? // muški, ženski, srednji
+  person          String? // prvo, drugo, treće
+  tense           String? // prezent, aorist, imperfekat, perfekat, pluskvamperfekat, futur
+  mood            String? // indikativ, imperativ, kondicional
+  voice           String? // aktiv, pasiv
+  definiteness    String? // određeni, neodređeni (for adjectives)
+  degree          String? // pozitiv, komparativ, superlativ
+
+  // Relations
+  word Word @relation(fields: [wordId], references: [id], onDelete: Cascade)
+
+  @@index([wordId])
+  @@index([form])
+  @@index([formCyrillic])
+  @@index([formLatin])
+  @@map("inflections")
+}
+
+// Pronunciation data
+model Pronunciation {
+  id             String  @id @default(cuid())
+  wordId         String  @map("word_id")
+  ipa            String? // IPA transcription
+  audioUrl       String? @map("audio_url")
+  syllables      String? // Syllable breakdown: "reč-nik"
+  stressPosition Int?    @map("stress_position") // 1-indexed syllable number
+  source         String? // TTS provider, recording source
+
+  // Relations
+  word Word @relation(fields: [wordId], references: [id], onDelete: Cascade)
+
+  @@index([wordId])
+  @@map("pronunciations")
+}
+
+// Etymology
+model Etymology {
+  id             String  @id @default(cuid())
+  wordId         String  @map("word_id")
+  originLanguage String? @map("origin_language") // praslovenski, latinski, grčki, etc.
+  etymologyText  String  @map("etymology_text")
+  cognates       String? // Related words in other languages
+  source         String?
+
+  // Relations
+  word Word @relation(fields: [wordId], references: [id], onDelete: Cascade)
+
+  @@index([wordId])
+  @@map("etymologies")
+}
+
+// Synonyms/Antonyms/Related words
+model WordRelation {
+  id            String @id @default(cuid())
+  wordId        String @map("word_id")
+  relatedWordId String @map("related_word_id")
+  relationType  String @map("relation_type") // synonym, antonym, hypernym, hyponym, derived, compound
+
+  // Relations
+  word        Word @relation("RelatedFrom", fields: [wordId], references: [id], onDelete: Cascade)
+  relatedWord Word @relation("RelatedTo", fields: [relatedWordId], references: [id], onDelete: Cascade)
+
+  @@unique([wordId, relatedWordId, relationType])
+  @@index([wordId])
+  @@index([relatedWordId])
+  @@map("word_relations")
+}
+
+// Word of the Day tracking
+model WordOfDay {
+  id        String   @id @default(cuid())
+  wordId    String   @map("word_id")
+  date      DateTime @unique @db.Date
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  word Word @relation(fields: [wordId], references: [id], onDelete: Cascade)
+
+  @@index([date])
+  @@map("word_of_day")
+}
