@@ -2,98 +2,131 @@
 
 **Last Updated:** 2025-01-21
 
+---
+
 ## Current Environment
 
-- **Database:** PostgreSQL 17 (local via Homebrew)
-- **Database Name:** recnik
-- **Status:** Running with 10 sample words seeded
-- **Dev Server:** http://localhost:3000
+| Component | Status | Details |
+|-----------|--------|---------|
+| **PostgreSQL** | Running | Version 17 via Homebrew |
+| **Database** | Created | `recnik` with schema pushed |
+| **Sample Data** | Seeded | 10 words for testing |
+| **Dev Server** | Available | http://localhost:3000 |
+| **Prisma Studio** | Available | http://localhost:5555 |
+
+### Quick Start Commands
+
+```bash
+# Start PostgreSQL (if not running)
+brew services start postgresql@17
+
+# Start dev server
+cd /Users/draganbesevic/Projects/claude/Recnik
+npm run dev
+
+# Open database UI
+npx prisma studio
+```
+
+---
 
 ## Overall Progress
 
 | Phase | Status | Progress |
 |-------|--------|----------|
-| Phase 1: Data Acquisition | In Progress | 60% |
+| Phase 1: Data Acquisition | Scripts Ready | 70% |
 | Phase 2: Database Schema | Complete | 100% |
 | Phase 3: Backend Development | Complete | 100% |
-| Phase 4: Frontend Development | Partial | 80% |
-| Phase 5: Data Import Scripts | Partial | 70% |
+| Phase 4: Frontend Development | Mostly Complete | 85% |
+| Phase 5: Data Import Scripts | Scripts Ready | 80% |
 | Phase 6: Deployment | Not Started | 0% |
 
+**Overall: ~70% complete**
+
 ---
 
-## Milestone 1: Foundation - COMPLETE
+## What's Working Now
+
+- Homepage with search bar and alphabet navigation
+- Word detail pages with definitions, examples, inflections
+- Search results page
+- Browse by letter (А-Ш)
+- Dark/light theme toggle
+- All API endpoints
+- Database with 10 sample Serbian words
+
+---
+
+## Milestone Status
+
+### Milestone 1: Foundation - COMPLETE
+
+| Task | Status |
+|------|--------|
+| Next.js project setup | Done |
+| PostgreSQL + Prisma schema | Done |
+| Data source download scripts | Done |
+| Parsing scripts | Done |
+
+### Milestone 2: Data Pipeline - SCRIPTS READY (NOT RUN)
 
 | Task | Status | Notes |
 |------|--------|-------|
-| Next.js project setup | Done | TypeScript, Tailwind CSS |
-| PostgreSQL schema with Prisma | Done | 8 tables defined |
-| Download srLex dataset | Done | Script created |
-| Download putnich/sr-sh-nlp | Done | Script created |
-| Parsing scripts | Done | srLex and Wiktionary parsers |
+| Parse srLex inflections | Script ready | `parse-srlex.ts` |
+| Parse Wiktionary definitions | Script ready | `parse-wiktionary.ts` |
+| Merge/deduplication | Script ready | `merge-data.ts` |
+| Import to database | Script ready | `import-to-db.ts` |
+| **Full data import** | **Not run** | Only 10 sample words |
+| Serbian WordNet integration | Not started | Script needed |
+
+### Milestone 3: Core Features - COMPLETE
+
+| Task | Status |
+|------|--------|
+| Search API with autocomplete | Done |
+| Word detail API | Done |
+| Random word API | Done |
+| Word of day API | Done |
+| Inflections API | Done |
+| Homepage | Done |
+| Word detail page | Done |
+
+### Milestone 4: Content Enhancement - PARTIAL
+
+| Task | Status |
+|------|--------|
+| Search results page | Done |
+| Browse by letter | Done |
+| Inflection tables | Done |
+| Audio player component | Done |
+| Etymology section | Done |
+| Browse by category | Not started |
+| TTS audio generation | Not started |
+
+### Milestone 5: Polish & Launch - NOT STARTED
+
+| Task | Status |
+|------|--------|
+| SEO meta tags | Not started |
+| JSON-LD structured data | Not started |
+| Sitemap generation | Not started |
+| Performance optimization | Not started |
+| Production deployment | Not started |
 
 ---
 
-## Milestone 2: Data Pipeline - IN PROGRESS
+## File Inventory
 
-| Task | Status | Notes |
-|------|--------|-------|
-| Parse srLex inflections | Done | `parse-srlex.ts` |
-| Parse Wiktionary definitions | Done | `parse-wiktionary.ts` |
-| Merge/deduplication logic | Done | `merge-data.ts` |
-| Import to database | Done | `import-to-db.ts` |
-| Serbian WordNet integration | Not Started | Script needed |
-| MaCoCu example extraction | Not Started | Script needed |
-
----
-
-## Milestone 3: Core Features - COMPLETE
-
-| Task | Status | Notes |
-|------|--------|-------|
-| Search API with autocomplete | Done | `/api/words/search` |
-| Word detail API | Done | `/api/words/[word]` |
-| Random word API | Done | `/api/words/random` |
-| Word of day API | Done | `/api/words/word-of-day` |
-| Inflections API | Done | `/api/inflections/[word]` |
-| Homepage with search | Done | `src/app/page.tsx` |
-| Word detail page | Done | `src/app/rec/[word]/page.tsx` |
-
----
-
-## Milestone 4: Content Enhancement - PARTIAL
-
-| Task | Status | Notes |
-|------|--------|-------|
-| Search results page | Done | `src/app/pretraga/page.tsx` |
-| Browse by letter | Done | `src/app/abeceda/[letter]/page.tsx` |
-| Inflection tables component | Done | `InflectionTable.tsx` |
-| Audio player component | Done | `AudioPlayer.tsx` |
-| Etymology section | Done | In word detail page |
-| Browse by category | Not Started | `/kategorija/[category]` |
-| Example sentence extraction | Not Started | GDEX algorithm |
-| TTS audio generation | Not Started | |
-
----
-
-## Milestone 5: Polish & Launch - NOT STARTED
-
-| Task | Status | Notes |
-|------|--------|-------|
-| SEO meta tags | Not Started | |
-| Structured data (JSON-LD) | Not Started | |
-| Sitemap generation | Not Started | |
-| Performance optimization | Not Started | |
-| Analytics integration | Not Started | |
-| Production deployment | Not Started | |
-
----
-
-## Implemented Files
+### Documentation (`Docs/`)
+- `PROJECT_PLAN.md` - Original project plan
+- `PROJECT_STATUS.md` - This file
+- `CHANGELOG.md` - Version history
+- `DATABASE_SETUP.md` - PostgreSQL & Prisma guide
+- `NEXT_STEPS.md` - How to continue
 
 ### Source Code (`src/`)
 
-**Pages:**
+**Pages (6):**
 - `app/page.tsx` - Homepage
 - `app/rec/[word]/page.tsx` - Word detail
 - `app/pretraga/page.tsx` - Search results
@@ -101,76 +134,60 @@
 - `app/not-found.tsx` - 404 page
 - `app/layout.tsx` - Root layout
 
-**API Routes:**
-- `app/api/words/search/route.ts`
-- `app/api/words/[word]/route.ts`
-- `app/api/words/random/route.ts`
-- `app/api/words/word-of-day/route.ts`
-- `app/api/inflections/[word]/route.ts`
+**API Routes (5):**
+- `api/words/search/route.ts`
+- `api/words/[word]/route.ts`
+- `api/words/random/route.ts`
+- `api/words/word-of-day/route.ts`
+- `api/inflections/[word]/route.ts`
 
-**Components:**
-- `components/SearchBar.tsx` - Autocomplete search
-- `components/WordCard.tsx` - Word preview card
-- `components/DefinitionList.tsx` - Definition display
-- `components/InflectionTable.tsx` - Conjugation/declension tables
-- `components/AudioPlayer.tsx` - Pronunciation playback
-- `components/ThemeToggle.tsx` - Dark/light mode
-- `components/Header.tsx` - Site header
-- `components/Footer.tsx` - Site footer
+**Components (8):**
+- `SearchBar.tsx` - Autocomplete search
+- `WordCard.tsx` - Word preview card
+- `DefinitionList.tsx` - Definition display
+- `InflectionTable.tsx` - Conjugation/declension
+- `AudioPlayer.tsx` - Pronunciation playback
+- `ThemeToggle.tsx` - Dark/light mode
+- `Header.tsx` - Site header
+- `Footer.tsx` - Site footer
 
-**Libraries:**
+**Libraries (3):**
 - `lib/db.ts` - Prisma client
 - `lib/transliterate.ts` - Cyrillic/Latin conversion
 - `lib/search.ts` - Search utilities
 
-**Types:**
+**Types (1):**
 - `types/dictionary.ts` - TypeScript definitions
 
 ### Scripts (`scripts/`)
-
 - `download-sources.ts` - Download data sources
 - `parse-srlex.ts` - Parse srLex inflections
 - `parse-wiktionary.ts` - Parse Wiktionary data
 - `merge-data.ts` - Merge all sources
 - `import-to-db.ts` - Import to PostgreSQL
-- `seed.ts` - Sample data for testing
+- `seed.ts` - Sample data (10 words)
 
 ### Database (`prisma/`)
-
-- `schema.prisma` - Database schema (8 tables)
-
----
-
-## Not Yet Implemented
-
-### Scripts Needed
-- `integrate-wordnet.ts` - Serbian WordNet import
-- `extract-examples.ts` - MaCoCu corpus examples
-- `generate-audio.ts` - TTS pronunciation
-
-### Pages Needed
-- `/kategorija/[category]` - Browse by domain/category
-
-### Features Needed
-- Full-text search with `pg_trgm`
-- SEO structured data
-- Sitemap generation
-- Copy to clipboard buttons
+- `schema.prisma` - 8 tables defined
 
 ---
 
 ## Known Issues
 
-1. Database not yet populated with real data (only test seed data)
-2. No production deployment configured
-3. Audio files not yet generated
+1. **Only 10 sample words** - Full data pipeline not run yet
+2. **No audio files** - TTS generation not implemented
+3. **No production deployment** - Running locally only
 
 ---
 
-## Next Steps
+## Database Statistics (Current)
 
-1. Run data pipeline scripts to populate database
-2. Implement Serbian WordNet integration
-3. Add category browsing page
-4. SEO optimization
-5. Deploy to production
+| Table | Records |
+|-------|---------|
+| Words | 10 |
+| Definitions | 18 |
+| Examples | 34 |
+| Inflections | 14 |
+| Pronunciations | 10 |
+| Etymologies | 2 |
+| Word Relations | 3 |
