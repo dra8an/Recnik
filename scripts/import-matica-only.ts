@@ -31,7 +31,7 @@ const prisma = new PrismaClient({ adapter });
 
 const INPUT_FILE = path.join(process.cwd(), "data", "processed", "matica-srpska-parsed.json");
 
-const BATCH_SIZE = 200;
+const BATCH_SIZE = 50;
 const SOURCE = "matica-srpska-2011";
 
 // --- Types ---
@@ -223,7 +223,9 @@ async function importEntries(entries: ParsedEntry[]): Promise<{
       // Batch failed — fall back to individual inserts
       errors++;
       if (errors <= 3) {
-        console.error(`  Batch ${batchNum + 1} failed, falling back to individual inserts: ${(batchError as Error).message?.substring(0, 150)}`);
+        const errMsg = (batchError as Error).message || String(batchError);
+        console.error(`  Batch ${batchNum + 1} failed, falling back to individual inserts:`);
+        console.error(`    ${errMsg.substring(errMsg.indexOf('Unknown arg'), errMsg.indexOf('Unknown arg') + 300) || errMsg.substring(0, 500)}`);
       }
 
       for (const entry of batch) {

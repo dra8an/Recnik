@@ -658,7 +658,7 @@ function detectPartOfSpeech(
       if (adjMatch) {
         const adjEnd = text.indexOf(adjMatch[0]) + adjMatch[0].length;
         const beforeAdj = text.substring(0, adjEnd);
-        defStartIdx = beforeAdj.split(/\s+/).length;
+        defStartIdx = beforeAdj.split(/\s+/).filter(Boolean).length;
         const afterAdj = text.substring(adjEnd).trim();
         for (const [marker, lang] of Object.entries(ETYMOLOGY_MAPPINGS)) {
           if (afterAdj.startsWith(marker) || afterAdj.startsWith(marker.replace(/\.$/, ""))) {
@@ -681,7 +681,7 @@ function detectPartOfSpeech(
         if (adjMatch) {
           const adjEnd = text.indexOf(adjMatch[0]) + adjMatch[0].length;
           const beforeAdj = text.substring(0, adjEnd);
-          defStartIdx = beforeAdj.split(/\s+/).length;
+          defStartIdx = beforeAdj.split(/\s+/).filter(Boolean).length;
           // Skip optional (комп. ...) parenthetical
           const afterAdj = text.substring(adjEnd).trim();
           if (afterAdj.startsWith("(комп.")) {
