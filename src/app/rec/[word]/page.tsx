@@ -24,31 +24,39 @@ function splitIdiomPhrases(text: string): string[] {
   const KNOWN_ABBREVS = new Set([
     "зоол", "астр", "лингв", "правн", "техн", "грађ", "архит", "геогр", "геол",
     "анат", "информ", "цркв", "слик", "разг", "жарг", "књиж", "песн", "експр",
-    "помор", "ковач", "кроз",
+    "помор", "ковач", "кроз", "фарм", "технол",
   ]);
 
-  // Split on ". " that is preceded by 4+ Cyrillic chars (a real word ending, not
-  // an abbreviation like в., уп., етн., изр.) and followed by a Cyrillic letter, ( or ~.
-  const parts = text
-    .split(/(?<=[а-яђјљњћџА-ЯЂЈЉЊЋЏ]{4,})\.\s+(?=[а-яђјљњћџА-ЯЂЈЉЊЋЏ(~])/)
-    .map((p) => p.trim())
-    .filter((p) => p.length > 0);
+  // First split on "•" which separates sub-sections within idiom text
+  const sections = text.split(/\s*•\s*/).filter((s) => s.trim().length > 0);
 
-  // Merge back parts that were incorrectly split on an abbreviation
-  const merged: string[] = [];
-  for (const part of parts) {
-    if (merged.length > 0) {
-      const prev = merged[merged.length - 1];
-      const lastWord = prev.match(/([а-яђјљњћџА-ЯЂЈЉЊЋЏ]+)$/);
-      if (lastWord && KNOWN_ABBREVS.has(lastWord[1].toLowerCase())) {
-        merged[merged.length - 1] = prev + ". " + part;
-        continue;
+  const allPhrases: string[] = [];
+  for (const section of sections) {
+    // Split on ". " preceded by 4+ Cyrillic chars (optionally followed by ")")
+    // and followed by a Cyrillic letter, ( or ~.
+    const parts = section
+      .split(/(?<=[а-яђјљњћџА-ЯЂЈЉЊЋЏ]{4,}\)?)\.\s+(?=[а-яђјљњћџА-ЯЂЈЉЊЋЏ(~])/)
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0);
+
+    // Merge back parts that were incorrectly split on an abbreviation
+    const merged: string[] = [];
+    for (const part of parts) {
+      if (merged.length > 0) {
+        const prev = merged[merged.length - 1];
+        const lastWord = prev.match(/([а-яђјљњћџА-ЯЂЈЉЊЋЏ]+)\)?$/);
+        if (lastWord && KNOWN_ABBREVS.has(lastWord[1].toLowerCase())) {
+          merged[merged.length - 1] = prev + ". " + part;
+          continue;
+        }
       }
+      merged.push(part);
     }
-    merged.push(part);
+
+    allPhrases.push(...merged);
   }
 
-  return merged;
+  return allPhrases;
 }
 
 /**
