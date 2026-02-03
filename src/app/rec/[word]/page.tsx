@@ -20,12 +20,35 @@ interface PageProps {
  * We avoid splitting on ". " followed by a digit (numbered sub-definitions like "2)").
  */
 function splitIdiomPhrases(text: string): string[] {
+  // Known domain/register abbreviations (4+ Cyrillic chars) that should NOT trigger a split
+  const KNOWN_ABBREVS = new Set([
+    "зоол", "астр", "лингв", "правн", "техн", "грађ", "архит", "геогр", "геол",
+    "анат", "информ", "цркв", "слик", "разг", "жарг", "књиж", "песн", "експр",
+    "помор", "ковач", "кроз",
+  ]);
+
   // Split on ". " that is preceded by 4+ Cyrillic chars (a real word ending, not
   // an abbreviation like в., уп., етн., изр.) and followed by a Cyrillic letter, ( or ~.
-  return text
+  const parts = text
     .split(/(?<=[а-яђјљњћџА-ЯЂЈЉЊЋЏ]{4,})\.\s+(?=[а-яђјљњћџА-ЯЂЈЉЊЋЏ(~])/)
     .map((p) => p.trim())
     .filter((p) => p.length > 0);
+
+  // Merge back parts that were incorrectly split on an abbreviation
+  const merged: string[] = [];
+  for (const part of parts) {
+    if (merged.length > 0) {
+      const prev = merged[merged.length - 1];
+      const lastWord = prev.match(/([а-яђјљњћџА-ЯЂЈЉЊЋЏ]+)$/);
+      if (lastWord && KNOWN_ABBREVS.has(lastWord[1].toLowerCase())) {
+        merged[merged.length - 1] = prev + ". " + part;
+        continue;
+      }
+    }
+    merged.push(part);
+  }
+
+  return merged;
 }
 
 /**
@@ -55,9 +78,9 @@ function splitExpressionAndExplanation(
   const escapedStem = stem.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const stemPattern = new RegExp(escapedStem + "[а-яђјљњћџ\\-]*", "gi");
 
-  // Find the last occurrence of ~ or headword stem in the first 60% of phrase
+  // Find the last occurrence of ~ or headword stem in the first 70% of phrase
   let lastMatchEnd = -1;
-  const searchLimit = Math.floor(phrase.length * 0.6);
+  const searchLimit = Math.floor(phrase.length * 0.7);
 
   // Check for ~ (only directly attached chars like ~се, not trailing text)
   let tildeIdx = -1;
