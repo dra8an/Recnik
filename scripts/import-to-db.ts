@@ -5,6 +5,7 @@
 import "dotenv/config";
 import * as fs from "fs";
 import * as path from "path";
+import * as readline from "readline";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
@@ -71,6 +72,7 @@ function isCommonWord(word: string): boolean {
   return commonWordsList.has(word.toLowerCase());
 }
 
+// Stream-read the large merged JSON file (same approach as merge-data.ts)
 async function loadMergedData(): Promise<MergedEntry[]> {
   const filepath = path.join(OUTPUT_DIR, "merged-dictionary.json");
 
@@ -78,9 +80,70 @@ async function loadMergedData(): Promise<MergedEntry[]> {
     throw new Error(`Merged data file not found: ${filepath}. Run merge-data.ts first.`);
   }
 
-  console.log(`Loading merged data from ${filepath}...`);
-  const content = fs.readFileSync(filepath, "utf-8");
-  return JSON.parse(content);
+  console.log(`Loading merged data from ${filepath} (streaming)...`);
+  const entries: MergedEntry[] = [];
+
+  return new Promise((resolve, reject) => {
+    const fileStream = fs.createReadStream(filepath, { encoding: "utf-8" });
+    const rl = readline.createInterface({
+      input: fileStream,
+      crlfDelay: Infinity,
+    });
+
+    let buffer = "";
+    let insideEntry = false;
+    let braceCount = 0;
+    let entriesProcessed = 0;
+
+    rl.on("line", (line) => {
+      // Skip array brackets
+      const trimmed = line.trim();
+      if (trimmed === "[" || trimmed === "]") return;
+
+      // Track brace depth to know when we have a complete entry
+      for (const char of line) {
+        if (char === "{") {
+          if (!insideEntry) insideEntry = true;
+          braceCount++;
+        } else if (char === "}") {
+          braceCount--;
+        }
+      }
+
+      buffer += line;
+
+      // When braces are balanced, we have a complete entry
+      if (insideEntry && braceCount === 0) {
+        // Remove trailing comma if present
+        let jsonStr = buffer.trim();
+        if (jsonStr.endsWith(",")) {
+          jsonStr = jsonStr.slice(0, -1);
+        }
+
+        try {
+          const entry: MergedEntry = JSON.parse(jsonStr);
+          entries.push(entry);
+          entriesProcessed++;
+
+          if (entriesProcessed % 50000 === 0) {
+            console.log(`  Loaded ${entriesProcessed} entries...`);
+          }
+        } catch (e) {
+          // Skip malformed entries
+        }
+
+        buffer = "";
+        insideEntry = false;
+      }
+    });
+
+    rl.on("close", () => {
+      console.log(`  Total entries loaded: ${entries.length}`);
+      resolve(entries);
+    });
+
+    rl.on("error", reject);
+  });
 }
 
 async function clearDatabase(): Promise<void> {

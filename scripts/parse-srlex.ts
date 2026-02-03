@@ -43,18 +43,21 @@ interface InflectionEntry {
   mood?: string;
 }
 
-// Part of speech mapping from srLex tags
+// Part of speech mapping from srLex MULTEXT-East tags
 const posMapping: Record<string, string> = {
-  N: "imenica",
-  V: "glagol",
-  A: "pridev",
-  R: "prilog",
-  P: "zamenica",
-  S: "predlog",
-  C: "veznik",
-  I: "uzvik",
-  M: "broj",
-  Q: "čestica",
+  N: "imenica",      // Noun
+  V: "glagol",       // Verb
+  A: "pridev",       // Adjective
+  R: "prilog",       // Adverb
+  P: "zamenica",     // Pronoun
+  S: "predlog",      // Adposition/Preposition
+  C: "veznik",       // Conjunction
+  I: "uzvik",        // Interjection
+  M: "broj",         // Numeral
+  Q: "čestica",      // Particle
+  X: "ostalo",       // Residual
+  Y: "skraćenica",   // Abbreviation
+  Z: "interpunkcija", // Punctuation
 };
 
 // Gender mapping
@@ -253,53 +256,39 @@ async function main(): Promise<void> {
   console.log("srLex Parser");
   console.log("============\n");
 
-  // Find srLex data files
-  const srLexDir = path.join(DATA_DIR, "srLex");
-
-  if (!fs.existsSync(srLexDir)) {
-    console.error("[ERROR] srLex directory not found. Run download-sources.ts first.");
-    process.exit(1);
-  }
-
-  // Look for the main lexicon file
-  const possibleFiles = [
-    "srLex.txt",
-    "srLex_v1.3.txt",
-    "sr_full.txt",
-    "lexicon.txt",
+  // Find srLex data file - check multiple possible locations and names
+  const possiblePaths = [
+    path.join(DATA_DIR, "srLex_v1.3"),
+    path.join(DATA_DIR, "srLex_v1.3.txt"),
+    path.join(DATA_DIR, "srLex.txt"),
+    path.join(DATA_DIR, "srLex", "srLex.txt"),
+    path.join(DATA_DIR, "srLex", "srLex_v1.3.txt"),
   ];
 
   let lexiconFile: string | null = null;
 
-  // Search for any .txt file in the directory
-  const files = fs.readdirSync(srLexDir);
-  for (const file of files) {
-    if (file.endsWith(".txt") || file.endsWith(".tsv")) {
-      lexiconFile = path.join(srLexDir, file);
+  // Check each possible path
+  for (const filepath of possiblePaths) {
+    if (fs.existsSync(filepath)) {
+      lexiconFile = filepath;
       break;
     }
   }
 
-  // Also check subdirectories
-  if (!lexiconFile) {
-    for (const item of files) {
-      const itemPath = path.join(srLexDir, item);
-      if (fs.statSync(itemPath).isDirectory()) {
-        const subFiles = fs.readdirSync(itemPath);
-        for (const subFile of subFiles) {
-          if (subFile.endsWith(".txt") || subFile.endsWith(".tsv")) {
-            lexiconFile = path.join(itemPath, subFile);
-            break;
-          }
-        }
+  // If not found, search data/raw for any srLex file
+  if (!lexiconFile && fs.existsSync(DATA_DIR)) {
+    const files = fs.readdirSync(DATA_DIR);
+    for (const file of files) {
+      if (file.toLowerCase().includes("srlex") && !file.endsWith(".gz")) {
+        lexiconFile = path.join(DATA_DIR, file);
+        break;
       }
-      if (lexiconFile) break;
     }
   }
 
   if (!lexiconFile) {
-    console.error("[ERROR] No lexicon file found in srLex directory");
-    console.log("Directory contents:", files);
+    console.error("[ERROR] srLex file not found in data/raw/");
+    console.error("Expected one of:", possiblePaths);
     process.exit(1);
   }
 

@@ -8,6 +8,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import * as readline from "readline";
 
 const OUTPUT_DIR = path.join(process.cwd(), "data", "processed");
 
@@ -79,6 +80,79 @@ interface MergedEntry {
   source: string[];
 }
 
+// Stream-read the large srLex JSON file
+async function loadSrLexStreaming(filepath: string): Promise<Map<string, SrLexEntry>> {
+  const map = new Map<string, SrLexEntry>();
+
+  if (!fs.existsSync(filepath)) {
+    console.log(`File not found: ${filepath}`);
+    return map;
+  }
+
+  return new Promise((resolve, reject) => {
+    const fileStream = fs.createReadStream(filepath, { encoding: "utf-8" });
+    const rl = readline.createInterface({
+      input: fileStream,
+      crlfDelay: Infinity,
+    });
+
+    let buffer = "";
+    let insideEntry = false;
+    let braceCount = 0;
+    let entriesProcessed = 0;
+
+    rl.on("line", (line) => {
+      // Skip array brackets
+      const trimmed = line.trim();
+      if (trimmed === "[" || trimmed === "]") return;
+
+      // Track brace depth to know when we have a complete entry
+      for (const char of line) {
+        if (char === "{") {
+          if (!insideEntry) insideEntry = true;
+          braceCount++;
+        } else if (char === "}") {
+          braceCount--;
+        }
+      }
+
+      buffer += line;
+
+      // When braces are balanced, we have a complete entry
+      if (insideEntry && braceCount === 0) {
+        // Remove trailing comma if present
+        let jsonStr = buffer.trim();
+        if (jsonStr.endsWith(",")) {
+          jsonStr = jsonStr.slice(0, -1);
+        }
+
+        try {
+          const entry: SrLexEntry = JSON.parse(jsonStr);
+          const key = `${entry.lemmaCyrillic}:${entry.partOfSpeech}`;
+          map.set(key, entry);
+          entriesProcessed++;
+
+          if (entriesProcessed % 50000 === 0) {
+            console.log(`  Loaded ${entriesProcessed} srLex entries...`);
+          }
+        } catch (e) {
+          // Skip malformed entries
+        }
+
+        buffer = "";
+        insideEntry = false;
+      }
+    });
+
+    rl.on("close", () => {
+      console.log(`  Total srLex entries loaded: ${map.size}`);
+      resolve(map);
+    });
+
+    rl.on("error", reject);
+  });
+}
+
 function loadJsonFile<T>(filepath: string): T | null {
   if (!fs.existsSync(filepath)) {
     console.log(`File not found: ${filepath}`);
@@ -98,30 +172,19 @@ async function main(): Promise<void> {
   console.log("Data Merger");
   console.log("===========\n");
 
-  // Load srLex data
+  // Load srLex data using streaming
   const srLexPath = path.join(OUTPUT_DIR, "srlex-parsed.json");
-  console.log("Loading srLex data...");
-  const srLexData = loadJsonFile<SrLexEntry[]>(srLexPath);
+  console.log("Loading srLex data (streaming)...");
+  const srLexMap = await loadSrLexStreaming(srLexPath);
 
-  // Load Wiktionary data
+  // Load Wiktionary data (smaller, can load normally)
   const wiktionaryPath = path.join(OUTPUT_DIR, "wiktionary-parsed.json");
   console.log("Loading Wiktionary data...");
   const wiktionaryData = loadJsonFile<WiktionaryEntry[]>(wiktionaryPath);
 
-  // Create lookup maps
-  const srLexMap = new Map<string, SrLexEntry>();
   const wiktionaryMap = new Map<string, WiktionaryEntry>();
-
-  if (srLexData) {
-    console.log(`srLex entries: ${srLexData.length}`);
-    for (const entry of srLexData) {
-      const key = `${entry.lemmaCyrillic}:${entry.partOfSpeech}`;
-      srLexMap.set(key, entry);
-    }
-  }
-
   if (wiktionaryData) {
-    console.log(`Wiktionary entries: ${wiktionaryData.length}`);
+    console.log(`  Wiktionary entries: ${wiktionaryData.length}`);
     for (const entry of wiktionaryData) {
       const key = `${entry.wordCyrillic}:${entry.partOfSpeech}`;
       wiktionaryMap.set(key, entry);
@@ -141,6 +204,7 @@ async function main(): Promise<void> {
   let withInflections = 0;
   let withPronunciation = 0;
 
+  let processed = 0;
   for (const key of allKeys) {
     const srLex = srLexMap.get(key);
     const wiktionary = wiktionaryMap.get(key);
@@ -201,6 +265,11 @@ async function main(): Promise<void> {
     }
 
     mergedEntries.push(merged);
+
+    processed++;
+    if (processed % 50000 === 0) {
+      console.log(`  Merged ${processed} entries...`);
+    }
   }
 
   console.log(`\nMerge complete:`);
@@ -210,6 +279,7 @@ async function main(): Promise<void> {
   console.log(`  With pronunciation: ${withPronunciation}`);
 
   // Sort by word
+  console.log("\nSorting entries...");
   mergedEntries.sort((a, b) => a.cyrillic.localeCompare(b.cyrillic, "sr"));
 
   // Save merged data
@@ -225,6 +295,10 @@ async function main(): Promise<void> {
     writeStream.write(JSON.stringify(entry));
     if (i < mergedEntries.length - 1) {
       writeStream.write(",\n");
+    }
+
+    if ((i + 1) % 50000 === 0) {
+      console.log(`  Written ${i + 1} entries...`);
     }
   }
 

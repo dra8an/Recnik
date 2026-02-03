@@ -194,31 +194,90 @@ async function parseTeiXml(filepath: string): Promise<WiktionaryEntry[]> {
     const content = fs.readFileSync(filepath, "utf-8");
     const result = await parseXml(content);
 
-    // Navigate TEI structure
-    const body = result?.TEI?.text?.[0]?.body?.[0];
-    if (!body) return entries;
+    // Handle putnich/sr-sh-nlp format: <entries><entry>...</entry></entries>
+    let entryElements = result?.entries?.entry || [];
 
-    const entryElements = body.entry || body.div || [];
+    // Also try TEI format
+    if (entryElements.length === 0) {
+      const body = result?.TEI?.text?.[0]?.body?.[0];
+      if (body) {
+        entryElements = body.entry || body.div || [];
+      }
+    }
 
     for (const entry of entryElements) {
-      const word = entry.$?.n || entry.form?.[0]?.orth?.[0] || "";
+      // Get word from xml:id attribute or form/orth
+      const word = entry.$?.["xml:id"] || entry.$?.id || entry.$?.n ||
+        extractText(entry.form?.[0]?.orth) || "";
       if (!word) continue;
 
       const { cyrillic, latin } = toBothScripts(word);
 
-      // Extract POS
+      // Extract POS from <gram type="pos">
       let partOfSpeech = "imenica";
-      if (entry.gramGrp?.[0]?.pos?.[0]) {
-        const posRaw = entry.gramGrp[0].pos[0].toLowerCase();
-        partOfSpeech = posMapping[posRaw] || posRaw;
+      const gramElement = entry.gram?.[0];
+      if (gramElement) {
+        const posText = extractText(gramElement);
+        if (posText) {
+          const posLower = posText.toLowerCase().trim();
+          partOfSpeech = posMapping[posLower] || posLower;
+        }
       }
 
       // Extract definitions from sense elements
       const definitions: string[] = [];
       const senses = entry.sense || [];
       for (const sense of senses) {
-        if (sense.def?.[0]) {
-          definitions.push(sense.def[0]);
+        const defElement = sense.def?.[0];
+        if (defElement) {
+          // Definition might be a string or object with text content
+          const defText = extractText(defElement);
+          if (defText) {
+            // Clean up the definition text (remove ref tags content)
+            const cleanDef = defText.replace(/<[^>]+>/g, "").trim();
+            if (cleanDef) definitions.push(cleanDef);
+          }
+        }
+      }
+
+      // Extract synonyms from <xr type="synonymy">
+      const synonyms: string[] = [];
+      for (const sense of senses) {
+        const xrElements = sense.xr || [];
+        for (const xr of xrElements) {
+          if (xr.$?.type === "synonymy") {
+            const innerLinks = xr.innerlink || [];
+            for (const link of innerLinks) {
+              const linkText = extractText(link);
+              if (linkText) synonyms.push(linkText);
+            }
+          }
+        }
+      }
+
+      // Also check top-level xr elements for synonyms
+      const topXr = entry.xr || [];
+      for (const xr of topXr) {
+        if (xr.$?.type === "synonymy") {
+          const innerLinks = xr.innerlink || [];
+          for (const link of innerLinks) {
+            const linkText = extractText(link);
+            if (linkText) synonyms.push(linkText);
+          }
+        }
+      }
+
+      // Extract pronunciation from <form type="lemma"><pron>
+      let ipa: string | undefined;
+      let syllables: string | undefined;
+
+      const formElement = entry.form?.find((f: any) => f.$?.type === "lemma") || entry.form?.[0];
+      if (formElement) {
+        if (formElement.pron?.[0]) {
+          ipa = extractText(formElement.pron[0]);
+        }
+        if (formElement.hyph?.[0]) {
+          syllables = extractText(formElement.hyph[0]);
         }
       }
 
@@ -228,16 +287,11 @@ async function parseTeiXml(filepath: string): Promise<WiktionaryEntry[]> {
         if (sense.cit) {
           for (const cit of sense.cit) {
             if (cit.quote?.[0]) {
-              examples.push(cit.quote[0]);
+              const quoteText = extractText(cit.quote[0]);
+              if (quoteText) examples.push(quoteText);
             }
           }
         }
-      }
-
-      // Extract pronunciation
-      let ipa: string | undefined;
-      if (entry.form?.[0]?.pron?.[0]) {
-        ipa = entry.form[0].pron[0];
       }
 
       entries.push({
@@ -246,10 +300,10 @@ async function parseTeiXml(filepath: string): Promise<WiktionaryEntry[]> {
         wordLatin: latin,
         partOfSpeech,
         definitions,
-        synonyms: [],
+        synonyms: [...new Set(synonyms)], // Remove duplicates
         antonyms: [],
         ipa,
-        syllables: undefined,
+        syllables,
         etymology: undefined,
         examples,
       });
@@ -259,6 +313,27 @@ async function parseTeiXml(filepath: string): Promise<WiktionaryEntry[]> {
   }
 
   return entries;
+}
+
+// Helper to extract text content from XML element
+function extractText(element: unknown): string {
+  if (typeof element === "string") {
+    return element.trim();
+  }
+  if (typeof element === "object" && element !== null) {
+    // Handle xml2js format where text is in _ property
+    const obj = element as Record<string, unknown>;
+    if (obj._) {
+      return String(obj._).trim();
+    }
+    // Try to get first string value
+    for (const value of Object.values(obj)) {
+      if (typeof value === "string") {
+        return value.trim();
+      }
+    }
+  }
+  return "";
 }
 
 async function findAndParseFiles(dir: string): Promise<WiktionaryEntry[]> {
