@@ -291,14 +291,16 @@ export default async function WordPage({ params }: PageProps) {
             </div>
           )}
 
-          {/* Pronunciation */}
-          <div className="mt-4">
-            <AudioPlayer
-              audioUrl={pronunciation?.audioUrl}
-              ipa={pronunciation?.ipa}
-              syllables={pronunciation?.syllables}
-            />
-          </div>
+          {/* Pronunciation — only show when data exists */}
+          {pronunciation && (pronunciation.audioUrl || pronunciation.ipa || pronunciation.syllables) && (
+            <div className="mt-4">
+              <AudioPlayer
+                audioUrl={pronunciation.audioUrl}
+                ipa={pronunciation.ipa}
+                syllables={pronunciation.syllables}
+              />
+            </div>
+          )}
         </header>
 
         {/* Definitions */}

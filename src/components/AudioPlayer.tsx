@@ -120,11 +120,7 @@ export default function AudioPlayer({
         </div>
       )}
 
-      {!audioUrl && !ipa && !syllables && (
-        <span className="text-sm text-gray-400 dark:text-gray-500 italic">
-          Изговор није доступан
-        </span>
-      )}
+      {/* Pronunciation info will be shown here when available */}
     </div>
   );
 }
