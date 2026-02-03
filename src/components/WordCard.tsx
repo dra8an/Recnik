@@ -17,20 +17,30 @@ const partOfSpeechLabels: Record<string, string> = {
   uzvik: "узв.",
   broj: "број",
   čestica: "чест.",
+  cestica: "чест.",
+  prefiks: "преф.",
+  odrednica: "одр.",
+  skracenica: "скр.",
 };
 
 export default function WordCard({ word, showDefinition = true }: WordCardProps) {
   const posLabel = partOfSpeechLabels[word.partOfSpeech] || word.partOfSpeech;
 
+  const homonymSuffix = word.homonymNumber && word.homonymNumber > 0 ? `-${word.homonymNumber}` : "";
+  const href = `/rec/${encodeURIComponent(word.latin)}${homonymSuffix}`;
+
   return (
     <Link
-      href={`/rec/${encodeURIComponent(word.latin)}`}
+      href={href}
       className="block p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-md transition-all bg-white dark:bg-gray-800"
     >
       <div className="flex items-start justify-between">
         <div>
           <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
             {word.cyrillic}
+            {word.homonymNumber && word.homonymNumber > 0 && (
+              <sup className="text-xs text-gray-400 ml-0.5">{word.homonymNumber}</sup>
+            )}
           </h3>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             {word.latin}

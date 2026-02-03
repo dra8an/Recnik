@@ -87,6 +87,11 @@ export async function GET(
         etymologyText: e.etymologyText,
         cognates: e.cognates,
       })),
+      idioms: (wordData.idioms ?? []).map((i) => ({
+        id: i.id,
+        phrase: i.phrase,
+        meaning: i.meaning,
+      })),
       synonyms,
       antonyms,
       relatedWords,

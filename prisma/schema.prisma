@@ -19,22 +19,26 @@ model Word {
   aspect        String?   // svršeni, nesvršeni (for verbs)
   frequencyRank Int?      @map("frequency_rank")
   isCommon      Boolean   @default(false) @map("is_common")
-  source        String?   // Data source reference
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  homonymNumber  Int       @default(0) @map("homonym_number")
+  rawText        String?   @map("raw_text")
+  inflectionInfo String?   @map("inflection_info")
+  source         String?   // Data source reference
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
   // Relations
   definitions    Definition[]
   inflections    Inflection[]
   pronunciations Pronunciation[]
   etymologies    Etymology[]
+  idioms         Idiom[]
   wordOfDay      WordOfDay[]
 
   // Self-referential relations for synonyms/antonyms
   relatedFrom    WordRelation[] @relation("RelatedFrom")
   relatedTo      WordRelation[] @relation("RelatedTo")
 
-  @@unique([cyrillic, partOfSpeech])
+  @@unique([cyrillic, partOfSpeech, homonymNumber])
   @@index([word])
   @@index([cyrillic])
   @@index([latin])
@@ -50,6 +54,7 @@ model Definition {
   definitionNumber Int      @default(1) @map("definition_number")
   register         String?  // formal, colloquial, archaic, etc.
   domain           String?  // medicine, law, technology, etc.
+  subLetter        String?  @map("sub_letter") // Sub-definition letter (а., б., в.)
   source           String?  // Origin of definition (wiktionary, etc.)
   createdAt        DateTime @default(now()) @map("created_at")
 
@@ -169,4 +174,20 @@ model WordOfDay {
 
   @@index([date])
   @@map("word_of_day")
+}
+
+// Idiomatic expressions from dictionary entries
+model Idiom {
+  id        String   @id @default(cuid())
+  wordId    String   @map("word_id")
+  phrase    String   // The idiomatic phrase
+  meaning   String?  // Meaning/explanation of the idiom
+  source    String?  // Data source reference
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  word Word @relation(fields: [wordId], references: [id], onDelete: Cascade)
+
+  @@index([wordId])
+  @@map("idioms")
 }

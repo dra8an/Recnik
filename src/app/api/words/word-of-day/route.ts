@@ -185,6 +185,7 @@ export async function GET() {
           etymologyText: e.etymologyText,
           cognates: e.cognates,
         })),
+        idioms: [],
         synonyms,
         antonyms,
         relatedWords,

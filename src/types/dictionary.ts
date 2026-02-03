@@ -10,7 +10,11 @@ export type PartOfSpeech =
   | "veznik"       // conjunction
   | "uzvik"        // interjection
   | "broj"         // numeral
-  | "čestica";     // particle
+  | "čestica"      // particle (legacy)
+  | "cestica"      // particle
+  | "prefiks"      // prefix
+  | "odrednica"    // entry (cross-reference only)
+  | "skracenica";  // abbreviation
 
 export type Gender = "muški" | "ženski" | "srednji";
 
@@ -54,6 +58,7 @@ export interface WordSummary {
   cyrillic: string;
   latin: string;
   partOfSpeech: string;
+  homonymNumber?: number;
   definition?: string;
 }
 
@@ -67,9 +72,12 @@ export interface WordDetail {
   aspect?: string | null;
   frequencyRank?: number | null;
   isCommon: boolean;
+  homonymNumber?: number;
+  rawText?: string | null;
   definitions: DefinitionWithExamples[];
   pronunciations: PronunciationData[];
   etymologies: EtymologyData[];
+  idioms: IdiomData[];
   synonyms: WordSummary[];
   antonyms: WordSummary[];
   relatedWords: WordSummary[];
@@ -79,9 +87,16 @@ export interface DefinitionWithExamples {
   id: string;
   definitionText: string;
   definitionNumber: number;
+  subLetter?: string | null;
   register?: string | null;
   domain?: string | null;
   examples: ExampleData[];
+}
+
+export interface IdiomData {
+  id: string;
+  phrase: string;
+  meaning?: string | null;
 }
 
 export interface ExampleData {

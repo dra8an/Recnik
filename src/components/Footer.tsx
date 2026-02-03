@@ -71,7 +71,7 @@ export default function Footer() {
         <div className="mt-8 pt-8 border-t border-gray-200 dark:border-gray-800 text-center text-sm text-gray-500 dark:text-gray-500">
           <p>&copy; {currentYear} Речник српског језика. Сва права задржана.</p>
           <p className="mt-1">
-            Подаци: srLex, Serbian Wiktionary, Serbian WordNet
+            Подаци: Речник српскога језика, Матица српска, 2011
           </p>
         </div>
       </div>

@@ -41,6 +41,7 @@ export async function searchWords({
         cyrillic: true,
         latin: true,
         partOfSpeech: true,
+        homonymNumber: true,
         definitions: {
           select: { definitionText: true },
           take: 1,
@@ -63,6 +64,7 @@ export async function searchWords({
     cyrillic: w.cyrillic,
     latin: w.latin,
     partOfSpeech: w.partOfSpeech,
+    homonymNumber: w.homonymNumber,
     definition: w.definitions[0]?.definitionText,
   }));
 
@@ -96,6 +98,7 @@ export async function getAutocompleteSuggestions(
       cyrillic: true,
       latin: true,
       partOfSpeech: true,
+      homonymNumber: true,
       definitions: {
         select: { definitionText: true },
         take: 1,
@@ -115,23 +118,41 @@ export async function getAutocompleteSuggestions(
     cyrillic: w.cyrillic,
     latin: w.latin,
     partOfSpeech: w.partOfSpeech,
+    homonymNumber: w.homonymNumber,
     definition: w.definitions[0]?.definitionText,
   }));
 }
 
 /**
+ * Parse a slug that may contain a homonym suffix (e.g., "а-2" → { word: "а", homonymNumber: 2 })
+ */
+function parseSlug(slug: string): { word: string; homonymNumber?: number } {
+  const decoded = decodeURIComponent(slug);
+  const match = decoded.match(/^(.+)-(\d+)$/);
+  if (match) {
+    return { word: match[1], homonymNumber: parseInt(match[2], 10) };
+  }
+  return { word: decoded };
+}
+
+/**
  * Find word by exact match (used for word detail page)
+ * Supports homonym suffix in slug: /rec/а-2 → word "а", homonymNumber 2
  */
 export async function findWordBySlug(slug: string) {
-  const { cyrillic, latin } = normalizeForSearch(decodeURIComponent(slug));
+  const { word, homonymNumber } = parseSlug(slug);
+  const { cyrillic, latin } = normalizeForSearch(word);
+
+  const whereClause = {
+    OR: [
+      { cyrillic: { equals: cyrillic, mode: "insensitive" as const } },
+      { latin: { equals: latin, mode: "insensitive" as const } },
+    ],
+    ...(homonymNumber !== undefined ? { homonymNumber } : {}),
+  };
 
   return prisma.word.findFirst({
-    where: {
-      OR: [
-        { cyrillic: { equals: cyrillic, mode: "insensitive" } },
-        { latin: { equals: latin, mode: "insensitive" } },
-      ],
-    },
+    where: whereClause,
     include: {
       definitions: {
         include: {
@@ -141,6 +162,7 @@ export async function findWordBySlug(slug: string) {
       },
       pronunciations: true,
       etymologies: true,
+      idioms: true,
       relatedFrom: {
         include: {
           relatedWord: {
@@ -155,6 +177,28 @@ export async function findWordBySlug(slug: string) {
         },
       },
     },
+  });
+}
+
+/**
+ * Find all homonyms for a given word (for navigation between homonyms)
+ */
+export async function findHomonyms(cyrillic: string) {
+  return prisma.word.findMany({
+    where: { cyrillic: { equals: cyrillic, mode: "insensitive" } },
+    select: {
+      id: true,
+      cyrillic: true,
+      latin: true,
+      partOfSpeech: true,
+      homonymNumber: true,
+      definitions: {
+        select: { definitionText: true },
+        take: 1,
+        orderBy: { definitionNumber: "asc" },
+      },
+    },
+    orderBy: { homonymNumber: "asc" },
   });
 }
 
@@ -187,6 +231,7 @@ export async function getWordsByLetter(
         cyrillic: true,
         latin: true,
         partOfSpeech: true,
+        homonymNumber: true,
         definitions: {
           select: { definitionText: true },
           take: 1,
@@ -207,6 +252,7 @@ export async function getWordsByLetter(
       cyrillic: w.cyrillic,
       latin: w.latin,
       partOfSpeech: w.partOfSpeech,
+      homonymNumber: w.homonymNumber,
       definition: w.definitions[0]?.definitionText,
     })),
     total,
