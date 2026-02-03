@@ -38,7 +38,7 @@ export default function WordCard({ word, showDefinition = true }: WordCardProps)
         <div>
           <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
             {word.cyrillic}
-            {word.homonymNumber > 0 && (
+            {(word.homonymNumber ?? 0) > 0 && (
               <sup className="text-xs text-gray-400 ml-0.5">{word.homonymNumber}</sup>
             )}
           </h3>
