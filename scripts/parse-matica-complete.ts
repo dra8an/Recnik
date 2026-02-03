@@ -863,8 +863,43 @@ function parseDefinitions(defText: string): ParsedDefinition[] {
     reflexiveIdx >= 0 ? mainText.substring(0, reflexiveIdx).trim() : mainText;
 
   // Try splitting by numbered definitions: 1. ... 2. ... 3. ...
-  // Match "1." at start or after space, but NOT "1." that's part of a cross-reference like "(1)"
-  const numberedParts = textForDefs.split(/(?:^|\s)(\d+)\.\s/);
+  // Only split on numbers that form a valid sequential definition sequence starting from 1.
+  // This avoids splitting on in-text numbers like "у 6. веку" (in the 6th century).
+  const defMarkerRegex = /(?:^|\s)(\d+)\.\s/g;
+  const candidates: { num: number; index: number; fullMatch: string }[] = [];
+  let defMatch;
+  while ((defMatch = defMarkerRegex.exec(textForDefs)) !== null) {
+    candidates.push({
+      num: parseInt(defMatch[1], 10),
+      index: defMatch.index,
+      fullMatch: defMatch[0],
+    });
+  }
+
+  // Filter to only keep numbers that form a valid sequence starting from 1
+  // A valid sequence: must contain 1, and each subsequent number must be prev+1
+  const validMarkers: typeof candidates = [];
+  let expectedNext = 1;
+  for (const c of candidates) {
+    if (c.num === expectedNext) {
+      validMarkers.push(c);
+      expectedNext++;
+    }
+  }
+
+  // Build split result compatible with previous code (mimics split with capture group)
+  let numberedParts: string[] = [""];
+  if (validMarkers.length >= 2) {
+    // Preamble: text before first marker
+    numberedParts = [textForDefs.substring(0, validMarkers[0].index).trim()];
+    for (let i = 0; i < validMarkers.length; i++) {
+      const marker = validMarkers[i];
+      const contentStart = marker.index + marker.fullMatch.length;
+      const contentEnd = i + 1 < validMarkers.length ? validMarkers[i + 1].index : textForDefs.length;
+      numberedParts.push(String(marker.num));
+      numberedParts.push(textForDefs.substring(contentStart, contentEnd).trim());
+    }
+  }
 
   if (numberedParts.length >= 3) {
     // We have numbered definitions
@@ -1068,11 +1103,19 @@ function extractCrossReferences(text: string): CrossReference[] {
   const hasSubDefs = /\sа\.\s/.test(searchText) || /\sб\.\s/.test(searchText);
   const hasNumberedDefs = /\s[12]\.\s/.test(searchText);
   if (!hasSubDefs && !hasNumberedDefs && text.length < 200) {
+    // Detect multi-redirect entries: "word1 в. target1, word2 в. target2, ..."
+    // These pack multiple redirects on one line. Only the FIRST "в." belongs
+    // to this entry's headword; the rest belong to other words on the same line.
     const seeRegex = new RegExp(
       `(?:^|\\s)в\\.\\s+(?:(?:под|код)\\s+)?([${CYR_ALL}\\-]+(?:\\s*\\([^)]*\\))?)`,
       "g"
     );
-    const seeMatches = searchText.matchAll(seeRegex);
+    const allSeeMatches = [...searchText.matchAll(seeRegex)];
+    const multiRedirectRegex = new RegExp(`,\\s*[${CYR_ALL}]`);
+    const isMultiRedirect = allSeeMatches.length >= 2 &&
+      multiRedirectRegex.test(searchText);
+
+    const seeMatches = isMultiRedirect ? allSeeMatches.slice(0, 1) : allSeeMatches;
     for (const m of seeMatches) {
       // Skip "в." after Roman numerals (XVII в. = 17th century)
       const matchPos = m.index!;

@@ -50,7 +50,13 @@ function extractCrossReferences(text: string): CrossReference[] {
       `(?:^|\\s)в\\.\\s+(?:(?:под|код)\\s+)?([${CYR_ALL}\\-]+(?:\\s*\\([^)]*\\))?)`,
       "g"
     );
-    const seeMatches = searchText.matchAll(seeRegex);
+    // Detect multi-redirect entries: "word1 в. target1, word2 в. target2, ..."
+    // Only the first "в." belongs to this entry's headword.
+    const allSeeMatches = [...searchText.matchAll(seeRegex)];
+    const multiRedirectRegex = new RegExp(`,\\s*[${CYR_ALL}]`);
+    const isMultiRedirect = allSeeMatches.length >= 2 &&
+      multiRedirectRegex.test(searchText);
+    const seeMatches = isMultiRedirect ? allSeeMatches.slice(0, 1) : allSeeMatches;
     for (const m of seeMatches) {
       // Skip "в." after Roman numerals (XVII в. = 17th century)
       const matchPos = m.index!;
