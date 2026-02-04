@@ -2,6 +2,8 @@
 
 Guide to continue development of the Recnik project.
 
+**Site is live at:** https://recnik.onrender.com/
+
 ---
 
 ## Quick Resume
@@ -9,11 +11,11 @@ Guide to continue development of the Recnik project.
 After a break, run these commands to get back to work:
 
 ```bash
-# 1. Start PostgreSQL
+# 1. Start PostgreSQL (for local development)
 brew services start postgresql@17
 
 # 2. Navigate to project
-cd /Users/draganbesevic/Projects/claude/Recnik
+cd /Users/draganbesevic/Projects/claude/recnik
 
 # 3. Start dev server
 npm run dev
@@ -29,95 +31,93 @@ npx prisma studio
 
 ## Priority Tasks
 
-### 1. Import Full Dictionary Data (HIGH PRIORITY)
+### 1. Fix Tilde (~) Replacement in Examples (HIGH PRIORITY)
 
-Currently only 10 sample words. Run the full pipeline to get ~200K words:
+**Problem**: The import script replaces `~` with the base headword form in examples and compounds. This produces grammatically incorrect text for adjectives and some verb entries where the headword should be inflected to match context.
 
-```bash
-# Step 1: Download source data (~5-10 min, ~500MB download)
-npx tsx scripts/download-sources.ts
+**Example**: For "стран" (foreign), `~ војска` becomes "стран војска" but should be "страна војска" (feminine form).
 
-# Step 2: Parse srLex inflections
-npx tsx scripts/parse-srlex.ts
+**Scope**: Affects adjective entries (~14K) and some verb entries. Nouns are generally unaffected.
 
-# Step 3: Parse Wiktionary definitions
-npx tsx scripts/parse-wiktionary.ts
+**Options**:
 
-# Step 4: Merge all data
-npx tsx scripts/merge-data.ts
+1. **Option A (recommended)**: Stop replacing `~` and display it as-is, matching printed dictionary convention. Serbian readers expect `~` notation.
+   - Change `import-matica-only.ts` line 163: remove `.replace(/~/g, cyrillic)`
+   - Optionally style `~` in the UI (bold, or show headword on hover/tooltip)
+   - Re-import data to Neon
 
-# Step 5: Import to database (~10-20 min)
-npx tsx scripts/import-to-db.ts
-```
-
-**Expected result:** ~200K words, ~6.9M inflections
-
-**Disk space needed:** ~2-3GB
+2. **Option B (advanced)**: Use srLex inflection data to look up the correct inflected form based on grammatical context. Requires NLP-level analysis — long-term enhancement.
 
 ---
 
-### 2. Test the Application
+### 2. Import srLex Inflections (MEDIUM PRIORITY)
 
-After importing data:
+Link the 6.9M inflected forms from srLex to the ~71K Matica dictionary entries, enabling declension/conjugation tables.
 
-- [ ] Search for common words (реч, књига, човек)
-- [ ] Test Cyrillic and Latin search
-- [ ] Check word detail pages
-- [ ] Verify inflection tables display correctly
-- [ ] Test browse by letter
-- [ ] Check dark/light mode
+**Blocker**: Would add 200-400 MB to the database. Neon free tier has a 500 MB limit (currently using ~115 MB). Options:
+- Import only inflections for words that exist in the DB (~40-50K lemmas, ~1.4-1.8M rows) — may fit within limits
+- Upgrade to Neon paid tier or migrate to self-hosted PostgreSQL
+- Use Neon's Launch plan ($19/mo) or a VPS with Docker (see `plan-deployment.md`)
+
+**Full plan**: See `Docs/plan-inflections.md`
+
+**Summary**:
+1. Create `scripts/import-inflections.ts` — stream `srlex-parsed.json`, match lemmas to existing Word records, batch insert
+2. Wire up `InflectionTable.tsx` component (already exists) with real data
+3. Restore "Падежи" feature card on homepage
+4. (Optional) Search by inflected form — fallback search on `inflections.formCyrillic`
 
 ---
 
-### 3. Serbian WordNet Integration (MEDIUM PRIORITY)
+### 3. SEO Optimization (MEDIUM PRIORITY)
 
-Add semantic relations from Serbian WordNet:
+Before promoting the site:
 
-**Need to create:** `scripts/integrate-wordnet.ts`
+- [ ] Add JSON-LD structured data for dictionary entries (`DefinedTerm` schema)
+- [ ] Generate `sitemap.xml` (~71K word URLs)
+- [ ] Optimize meta tags per page (title, description)
+- [ ] Add Open Graph images for social sharing
+- [ ] Submit sitemap to Google Search Console
 
-**Data source:** https://wn.jerteh.rs/
+---
 
-**What it adds:**
+### 4. Serbian WordNet Integration (LOW PRIORITY)
+
+Add semantic relations from Serbian WordNet (https://wn.jerteh.rs/):
+
+**Need to create**: `scripts/integrate-wordnet.ts`
+
+**What it adds**:
 - Better synonym/antonym relationships
-- Hypernyms (broader terms)
-- Hyponyms (narrower terms)
-- Semantic domains
+- Hypernyms (broader terms) / hyponyms (narrower terms)
+- Semantic domains for category browsing
 
 ---
 
-### 4. Category Browsing Page (MEDIUM PRIORITY)
+### 5. Category Browsing Page (LOW PRIORITY)
 
-**Need to create:** `src/app/kategorija/[category]/page.tsx`
+**Need to create**: `src/app/kategorija/[category]/page.tsx`
 
-Browse words by domain/category (e.g., medicine, law, cooking).
-
-Requires WordNet integration first for domain data.
+Browse words by domain/category (medicine, law, cooking, etc.). Requires WordNet integration for domain data.
 
 ---
 
-### 5. SEO Optimization (BEFORE LAUNCH)
+## Known Issues
 
-- [ ] Add JSON-LD structured data for dictionary entries
-- [ ] Generate sitemap.xml
-- [ ] Optimize meta tags per page
-- [ ] Add Open Graph images
+### 1. Tilde (~) Replacement (see Priority Task #1 above)
 
----
+### 2. Cold Starts on Free Tier
 
-### 6. Production Deployment (FINAL)
+- Render free tier spins down after ~15 min idle — cold start takes 30-60 seconds
+- Neon auto-suspends after 5 min idle — adds ~1-2 seconds
+- **Mitigation**: Use a free cron service (cron-job.org, UptimeRobot) to ping the site every 14 minutes
 
-**Option A: Vercel + Supabase**
-1. Create Supabase project
-2. Update `.env` with Supabase DATABASE_URL
-3. Run `npx prisma db push`
-4. Import data (subset for free tier)
-5. Deploy to Vercel
+### 3. Neon Storage Limit
 
-**Option B: Self-hosted**
-- VPS with PostgreSQL
-- Docker deployment
-
-See `DATABASE_SETUP.md` for Supabase migration guide.
+- Neon free tier: 500 MB storage
+- Current usage: ~115 MB
+- Inflections import would add 200-400 MB, potentially exceeding the limit
+- **Options**: Import selectively, upgrade Neon, or migrate to self-hosted VPS
 
 ---
 
@@ -135,11 +135,43 @@ See `DATABASE_SETUP.md` for Supabase migration guide.
 
 ### TESLA Embeddings Integration
 - Better synonym detection using word vectors
-- See PROJECT_PLAN.md for details
+- See `PROJECT_PLAN.md` for details
 
-### Full-Text Search
+### Full-Text Search with Fuzzy Matching
 - Enable PostgreSQL `pg_trgm` extension
 - Add fuzzy matching for typos
+
+### Self-Hosted Migration
+- Move to a VPS (Hetzner CX22 ~€4/mo) for no cold starts and unlimited DB size
+- Docker deployment documented in `plan-deployment.md`
+
+---
+
+## Deployment Reference
+
+### Current Setup
+- **App**: Render free web service (GitHub auto-deploy)
+- **Database**: Neon PostgreSQL free tier (eu-central-1)
+- **URL**: https://recnik.onrender.com/
+
+### Deploying Changes
+```bash
+# Push to main branch — Render auto-deploys
+git add <files>
+git commit -m "Description of changes"
+git push
+```
+
+### Importing Data to Production (Neon)
+```bash
+# Point at Neon and run import script
+DATABASE_URL="<neon_connection_string>" npx tsx scripts/import-matica-only.ts
+```
+
+### Migrating Database Schema
+```bash
+DATABASE_URL="<neon_connection_string>" npx prisma db push
+```
 
 ---
 
@@ -147,15 +179,16 @@ See `DATABASE_SETUP.md` for Supabase migration guide.
 
 | Need to work on... | Look at... |
 |-------------------|------------|
-| Database setup | `Docs/DATABASE_SETUP.md` |
+| Database schema | `prisma/schema.prisma` |
 | Project plan | `Docs/PROJECT_PLAN.md` |
 | Current status | `Docs/PROJECT_STATUS.md` |
+| Deployment options | `Docs/plan-deployment.md` |
+| Inflections plan | `Docs/plan-inflections.md` |
 | API routes | `src/app/api/` |
 | Page components | `src/app/` |
 | UI components | `src/components/` |
 | Database queries | `src/lib/search.ts` |
-| Schema | `prisma/schema.prisma` |
-| Import scripts | `scripts/` |
+| Data import scripts | `scripts/` |
 
 ---
 
@@ -171,23 +204,19 @@ npm run lint                   # Run linter
 npx prisma studio              # Visual database browser
 npx prisma generate            # Regenerate client after schema change
 npx prisma db push             # Push schema changes to DB
-npx tsx scripts/seed.ts        # Reset to 10 sample words
+npx tsx scripts/seed.ts        # Reset to 10 sample words (local dev only)
 
-# Data Pipeline
+# Data Pipeline (local dev)
 npx tsx scripts/download-sources.ts
 npx tsx scripts/parse-srlex.ts
 npx tsx scripts/parse-wiktionary.ts
 npx tsx scripts/merge-data.ts
 npx tsx scripts/import-to-db.ts
 
-# PostgreSQL
+# Matica Srpska (the data currently in production)
+npx tsx scripts/import-matica-only.ts
+
+# PostgreSQL (local)
 brew services start postgresql@17
 brew services stop postgresql@17
-/usr/local/opt/postgresql@17/bin/psql recnik   # Connect to DB
 ```
-
----
-
-## Questions?
-
-Refer to documentation in `Docs/` folder or ask Claude to continue from this point.
