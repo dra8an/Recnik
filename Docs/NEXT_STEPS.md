@@ -3,6 +3,31 @@
 Guide to continue development of the Recnik project.
 
 **Site is live at:** https://recnik.onrender.com/
+**GitHub**: `git@github.com:dra8an/Recnik.git` (private)
+
+---
+
+## Project Context (read this first if starting fresh)
+
+Recnik is an online Serbian dictionary built from the official Rečnik Matice Srpske (2011), the most authoritative single-volume Serbian dictionary. There is no official digital version — we created one by OCR-ing the 1,530-page PDF, correcting systematic errors, parsing entries into structured data, and deploying as a web app.
+
+**How the data got here**:
+1. Source PDF: `~/Projects/claude/fetch/Recnik-srpskoga-jezika-2011.pdf`
+2. Tesseract OCR at 400 DPI → `data/raw/matica-srpska/recnik-tesseract-400dpi.txt`
+3. Error correction (OCR had systematic errors: т↔ш, г↔ћ, 6↔б, 0↔о) → `data/raw/matica-srpska/recnik-corrected.txt`
+4. Two-pass parser (`scripts/parse-matica-complete.ts`) → `data/processed/matica-srpska-parsed.json` (~71K entries)
+5. Import script (`scripts/import-matica-only.ts`) → PostgreSQL (Neon production DB)
+
+**Other parsed data available but not yet imported**:
+- `data/processed/srlex-parsed.json` — 192K lemmas, 6.9M inflections (1.2 GB). Source: srLex v1.3
+- `data/processed/wiktionary-parsed.json` — definitions from Serbian Wiktionary
+
+**Key design features**:
+- Search works in both Cyrillic and Latin script (transliteration via `src/lib/transliterate.ts`)
+- Dictionary cross-references (`в.` = see, `уп.` = compare) are parsed and rendered as clickable links
+- The `~` character in the original dictionary is shorthand for the headword in examples/compounds
+
+For full architecture details, see `Docs/PROJECT_STATUS.md`.
 
 ---
 
@@ -150,9 +175,22 @@ Browse words by domain/category (medicine, law, cooking, etc.). Requires WordNet
 ## Deployment Reference
 
 ### Current Setup
-- **App**: Render free web service (GitHub auto-deploy)
+- **App**: Render free web service (GitHub auto-deploy on push to `main`)
 - **Database**: Neon PostgreSQL free tier (eu-central-1)
 - **URL**: https://recnik.onrender.com/
+- **GitHub**: `git@github.com:dra8an/Recnik.git`
+
+### Render Dashboard Config (no render.yaml file exists)
+- **Build command**: `npm ci && npx prisma generate && npm run build`
+- **Start command**: `npm start`
+- **Instance type**: Free
+- **Env vars**: `DATABASE_URL` = Neon connection string, `NODE_ENV` = `production`
+
+### Neon Connection String Format
+```
+postgresql://user:pass@ep-xxx.eu-central-1.aws.neon.tech/recnik?sslmode=require
+```
+The actual credentials are in the Neon dashboard and in the local `.env` file (gitignored). The same `DATABASE_URL` is set in Render's environment variables.
 
 ### Deploying Changes
 ```bash
@@ -165,6 +203,17 @@ git push
 ### Importing Data to Production (Neon)
 ```bash
 # Point at Neon and run import script
+DATABASE_URL="<neon_connection_string>" npx tsx scripts/import-matica-only.ts
+```
+
+### Re-importing From Scratch
+If you need to re-import all data (e.g., after fixing the tilde issue):
+```bash
+# 1. The parser reads from the corrected OCR text:
+#    data/raw/matica-srpska/recnik-corrected.txt
+# 2. Re-parse if needed (only if corrected text changed):
+npx tsx scripts/parse-matica-complete.ts
+# 3. Import truncates all tables and re-imports:
 DATABASE_URL="<neon_connection_string>" npx tsx scripts/import-matica-only.ts
 ```
 

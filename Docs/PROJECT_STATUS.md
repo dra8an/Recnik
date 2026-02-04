@@ -4,6 +4,63 @@
 
 ---
 
+## What Is This
+
+Recnik is an online Serbian language dictionary at https://recnik.onrender.com/. It contains ~71,000 entries from the official Rečnik Matice Srpske (2011 edition) — the most authoritative single-volume Serbian dictionary.
+
+**GitHub**: `git@github.com:dra8an/Recnik.git` (private)
+
+There is no official digital version of this dictionary. We created one by:
+
+1. Taking the PDF (`~/Projects/claude/fetch/Recnik-srpskoga-jezika-2011.pdf`, 1,530 pages, two-column Cyrillic)
+2. Running Tesseract OCR at 400 DPI with Serbian language pack
+3. Correcting systematic OCR errors (see "OCR Error Patterns" below) using pattern-based scripts and Claude's knowledge of Serbian
+4. Parsing the corrected text into structured JSON with a two-pass parser
+5. Importing into PostgreSQL and deploying online
+
+### Data Sources
+
+| Source | What It Provides | Status |
+|--------|-----------------|--------|
+| **Matica Srpska 2011 PDF** | ~71K headwords, definitions, examples, cross-references, idioms | Imported to production |
+| **srLex v1.3** | 192K lemmas, 6.9M inflected forms (declensions/conjugations) | Parsed to JSON, not yet imported to DB |
+| **Serbian Wiktionary** (via sr-sh-nlp) | Alternative definitions, examples | Parsed to JSON, not yet imported |
+
+### OCR Error Patterns (for reference)
+
+The Tesseract OCR on this PDF produced these systematic errors that were corrected:
+
+| OCR Output | Correct | Example | Frequency |
+|------------|---------|---------|-----------|
+| т | ш | ошворени → отворени | ~50+ per page |
+| г | ћ | самогласник → самоћласник | ~10+ per page |
+| 6 | б | Cyrillic б misread as digit 6 | Common |
+| 0 | о | Digit zero vs letter о | Common |
+
+Corrections were applied to produce `data/raw/matica-srpska/recnik-corrected.txt`, which is the input for the parser.
+
+### Data Pipeline (how data flows)
+
+```
+PDF (1,530 pages)
+  → Tesseract OCR (400 DPI, srp language pack)
+  → data/raw/matica-srpska/recnik-tesseract-400dpi.txt
+  → Error correction (pattern-based + Claude review)
+  → data/raw/matica-srpska/recnik-corrected.txt
+  → parse-matica-complete.ts (two-pass: normalize lines, then parse entries)
+  → data/processed/matica-srpska-parsed.json (~71K entries)
+  → import-matica-only.ts (truncate + batch insert via Prisma)
+  → PostgreSQL (Neon production / local dev)
+```
+
+### Key Architectural Decisions
+
+- **Search is transliteration-aware**: Users can type in Cyrillic or Latin script; `lib/transliterate.ts` converts between them so search works in both. The DB stores both `cyrillic` and `latin` columns for each word.
+- **Cross-references**: The dictionary uses `в.` (види/see) and `уп.` (упореди/compare) to link entries. The parser extracts these, and `import-matica-only.ts` resolves them to `WordRelation` records in a second pass. `CrossRefText.tsx` renders them as clickable links in the UI.
+- **Prisma with PG adapter**: Uses `@prisma/adapter-pg` with raw `pg` Pool rather than Prisma's default connection, for compatibility with Neon's serverless driver.
+
+---
+
 ## Current Environment
 
 | Component | Status | Details |
@@ -111,6 +168,24 @@ npx prisma studio
 | Data imported to Neon | Done |
 | Render web service | Done |
 | Site live at recnik.onrender.com | Done |
+
+**Render configuration** (set in dashboard, no `render.yaml` file):
+- **Build command**: `npm ci && npx prisma generate && npm run build`
+- **Start command**: `npm start`
+- **Instance type**: Free
+- **Environment variables**: `DATABASE_URL` (Neon connection string), `NODE_ENV=production`
+- **Auto-deploy**: On push to `main` branch
+
+**Neon configuration**:
+- Region: eu-central-1
+- Connection string format: `postgresql://user:pass@ep-xxx.eu-central-1.aws.neon.tech/recnik?sslmode=require`
+- The Neon connection string is set as `DATABASE_URL` in both Render's environment and local `.env`
+
+**Environment variables** (`.env` file, gitignored):
+```
+DATABASE_URL="postgresql://..."   # Neon for production, localhost for dev
+NODE_ENV="development"
+```
 
 ### Milestone 5: Inflections - NOT STARTED
 
