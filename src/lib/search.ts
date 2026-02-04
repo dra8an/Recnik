@@ -124,14 +124,36 @@ export async function getAutocompleteSuggestions(
 }
 
 /**
- * Parse a slug that may contain a homonym suffix (e.g., "а-2" → { word: "а", homonymNumber: 2 })
+ * Valid POS values used as URL suffixes to disambiguate words with same spelling but different POS.
+ * E.g., /rec/pravo-prilog vs /rec/pravo-imenica
  */
-function parseSlug(slug: string): { word: string; homonymNumber?: number } {
+const VALID_POS = new Set([
+  "imenica", "glagol", "pridev", "prilog", "zamenica", "predlog",
+  "veznik", "uzvik", "broj", "cestica", "prefiks", "odrednica", "skracenica",
+]);
+
+/**
+ * Parse a slug that may contain a homonym suffix or POS suffix.
+ * Examples:
+ *   "а-2"       → { word: "а", homonymNumber: 2 }
+ *   "pravo-prilog" → { word: "pravo", partOfSpeech: "prilog" }
+ *   "pravo"     → { word: "pravo" }
+ */
+function parseSlug(slug: string): { word: string; homonymNumber?: number; partOfSpeech?: string } {
   const decoded = decodeURIComponent(slug);
-  const match = decoded.match(/^(.+)-(\d+)$/);
-  if (match) {
-    return { word: match[1], homonymNumber: parseInt(match[2], 10) };
+
+  // Check for homonym number suffix: word-2
+  const numMatch = decoded.match(/^(.+)-(\d+)$/);
+  if (numMatch) {
+    return { word: numMatch[1], homonymNumber: parseInt(numMatch[2], 10) };
   }
+
+  // Check for POS suffix: word-imenica, word-prilog, etc.
+  const posMatch = decoded.match(/^(.+)-([a-z]+)$/);
+  if (posMatch && VALID_POS.has(posMatch[2])) {
+    return { word: posMatch[1], partOfSpeech: posMatch[2] };
+  }
+
   return { word: decoded };
 }
 
@@ -140,7 +162,7 @@ function parseSlug(slug: string): { word: string; homonymNumber?: number } {
  * Supports homonym suffix in slug: /rec/а-2 → word "а", homonymNumber 2
  */
 export async function findWordBySlug(slug: string) {
-  const { word, homonymNumber } = parseSlug(slug);
+  const { word, homonymNumber, partOfSpeech } = parseSlug(slug);
   const { cyrillic, latin } = normalizeForSearch(word);
 
   const whereClause = {
@@ -149,6 +171,7 @@ export async function findWordBySlug(slug: string) {
       { latin: { equals: latin, mode: "insensitive" as const } },
     ],
     ...(homonymNumber !== undefined ? { homonymNumber } : {}),
+    ...(partOfSpeech ? { partOfSpeech } : {}),
   };
 
   return prisma.word.findFirst({

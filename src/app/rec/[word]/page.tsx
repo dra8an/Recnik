@@ -299,7 +299,10 @@ export default async function WordPage({ params }: PageProps) {
               <span className="text-sm text-gray-500 dark:text-gray-400">Хомоними:</span>
               {homonyms.map((h) => {
                 const isActive = h.id === wordData.id;
-                const suffix = h.homonymNumber > 0 ? `-${h.homonymNumber}` : "";
+                // Use homonym number if > 0, otherwise use POS to disambiguate
+                const suffix = h.homonymNumber > 0
+                  ? `-${h.homonymNumber}`
+                  : `-${h.partOfSpeech}`;
                 return (
                   <Link
                     key={h.id}
