@@ -15,9 +15,11 @@ export default function HomePage() {
         <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-gray-100 mb-4">
           Речник српског језика
         </h1>
+        <p className="text-lg md:text-xl text-gray-600 dark:text-gray-400 mb-2 max-w-2xl mx-auto">
+          Преко 70.000 одредница
+        </p>
         <p className="text-lg md:text-xl text-gray-600 dark:text-gray-400 mb-8 max-w-2xl mx-auto">
-          Свеобухватни речник са преко 70.000 речи, дефиницијама,
-          етимологијом, синонимима и граматичким информацијама.
+          Дефиниције, примери, синоними, изрази и фразе
         </p>
 
         <div className="max-w-2xl mx-auto">
